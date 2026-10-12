@@ -1,0 +1,48 @@
+# Virtual environment
+.venv/
+venv/
+ENV/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Data directories (raw / downloaded datasets - keep directory structure via .gitkeep)
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/crops/*
+!data/crops/.gitkeep
+data/datasets/*
+!data/datasets/.gitkeep
+data/test_samples/*
+!data/test_samples/.gitkeep
+!data/test_samples/*.jpg
+
+# Model weights and cache
+data/model_cache/
+models/checkpoints/*
+!models/checkpoints/.gitkeep
+models/cache/*
+!models/cache/.gitkeep
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.onnx
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs & temp
+*.log
+scratch/
+temp/
