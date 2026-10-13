@@ -29,9 +29,8 @@ class ParsedMedicationLine:
 
 
 # Regex patterns
-# Regex patterns
 DOSAGE_STRENGTH_PATTERN = re.compile(
-    r"(\d+(?:\.\d+)?\s*(?:mg|mcg|µg|gm|g|ml|iu|meq|%))",
+    r"(\d+(?:\.\d+)?\s*(?:mg|mcg|µg|gm|g|ml|iu|meq|%|sachets?|drops?|puffs?|units?))",
     re.IGNORECASE,
 )
 COMBINATION_STRENGTH_PATTERN = re.compile(
@@ -43,9 +42,37 @@ DURATION_PATTERN = re.compile(
     re.IGNORECASE,
 )
 INSTRUCTIONS_PATTERN = re.compile(
-    r"\b((?:before|after|with)\s+(?:meals?|food|breakfast|lunch|dinner)|empty\s+stomach|at\s+bedtime|bedtime|as\s+directed|externally|gargle|for\s+fever)\b",
+    r"\b((?:before|after|with)\s+(?:meals?|food|breakfast|lunch|dinner)|empty\s+stomach|at\s+bedtime|bedtime|as\s+directed|externally|gargle|for\s+fever|stat\.?|immediately|sos|as\s+needed)\b",
     re.IGNORECASE,
 )
+
+
+def is_clinical_finding(text: str) -> bool:
+    """Detects whether a line represents clinical symptoms, diagnosis, or vitals rather than medication."""
+    t = text.lower().strip()
+    # If the line contains an explicit dosage form or strength, it is a medication prescription
+    if any(f in t for f in ["tab ", "tab.", "cap ", "cap.", "syp ", "syp.", "inj ", "inj."]):
+        return False
+    if re.search(r"\b\d+\s*(?:mg|ml|mcg|gm)\b", t):
+        return False
+    clinical_keywords = [
+        "c/o", "co ", "imp:", "impression:", "o/e", "on exam",
+        "bp", "bp -", "pr -", "bpm", "pulse", "rbs", "spo2",
+        "hypoglycemic", "giddiness", "restlessness", "hypertension",
+        "diabetes"
+    ]
+    return any(k in t for k in clinical_keywords)
+
+
+def is_document_metadata(text: str) -> bool:
+    """Detects hospital letterheads, patient demographics, or signatures."""
+    t = text.lower().strip()
+    metadata_keywords = [
+        "hospital", "clinic", "centre", "center", "university",
+        "institute", "medical sciences", "dr.", "doctor", "mbbs", "md",
+        "patient", "uhid", "ip no", "signature", "date:"
+    ]
+    return any(k in t for k in metadata_keywords)
 
 
 def extract_prescription_entities(raw_line: str) -> ParsedMedicationLine:

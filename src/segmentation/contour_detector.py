@@ -28,6 +28,7 @@ class BoundingBox:
     h: int
     confidence: float = 1.0
     label: str = "text_line"
+    text: str = ""
 
     @property
     def x2(self) -> int:
@@ -80,6 +81,67 @@ def sort_bounding_boxes(
         sorted_boxes.extend(sorted(line, key=lambda b: b.x))
 
     return sorted_boxes
+
+
+def group_words_into_lines(detections: list, y_threshold: int = 22) -> List[BoundingBox]:
+    """
+    Groups individual word detections (e.g. from CRAFT/EasyOCR) into complete horizontal text lines.
+    """
+    items = []
+    for item in detections:
+        if len(item) == 3:
+            bbox, text, prob = item
+        elif len(item) == 2:
+            bbox, text = item
+            prob = 1.0
+        else:
+            continue
+        xs = [p[0] for p in bbox]
+        ys = [p[1] for p in bbox]
+        x1, y1, x2, y2 = min(xs), min(ys), max(xs), max(ys)
+        cy = (y1 + y2) / 2
+        items.append({
+            'x1': int(x1), 'y1': int(y1), 'x2': int(x2), 'y2': int(y2),
+            'cy': cy, 'text': text.strip(), 'prob': float(prob)
+        })
+    if not items:
+        return []
+
+    items = sorted(items, key=lambda it: it['cy'])
+    lines = []
+    current_line = []
+    for it in items:
+        if not current_line:
+            current_line.append(it)
+        else:
+            mean_cy = np.mean([w['cy'] for w in current_line])
+            if abs(it['cy'] - mean_cy) <= y_threshold:
+                current_line.append(it)
+            else:
+                lines.append(current_line)
+                current_line = [it]
+    if current_line:
+        lines.append(current_line)
+
+    merged_boxes: List[BoundingBox] = []
+    for line in lines:
+        line_sorted = sorted(line, key=lambda w: w['x1'])
+        min_x = min(w['x1'] for w in line_sorted)
+        min_y = min(w['y1'] for w in line_sorted)
+        max_x = max(w['x2'] for w in line_sorted)
+        max_y = max(w['y2'] for w in line_sorted)
+        avg_prob = float(np.mean([w['prob'] for w in line_sorted]))
+        combined_text = " ".join([w['text'] for w in line_sorted if w.get('text')]).strip()
+        merged_boxes.append(BoundingBox(
+            x=int(min_x),
+            y=int(min_y),
+            w=int(max(1, max_x - min_x)),
+            h=int(max(1, max_y - min_y)),
+            confidence=avg_prob,
+            label="text_line",
+            text=combined_text,
+        ))
+    return sort_bounding_boxes(merged_boxes)
 
 
 def segment_text_lines(

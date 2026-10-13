@@ -44,10 +44,8 @@ def get_device() -> torch.device:
 DEVICE = get_device()
 
 # OCR Recognition Settings
-# Use stage1 checkpoint for custom fine-tuning to avoid IAM bias;
-# Or trocr-small-handwritten for ultra-fast local CPU testing.
-DEFAULT_MODEL_NAME = os.getenv("DHPRS_MODEL_NAME", "microsoft/trocr-small-handwritten")
-FAST_CPU_MODEL_NAME = "microsoft/trocr-small-handwritten"
+DEFAULT_MODEL_NAME = os.getenv("DHPRS_MODEL_NAME", "shubham879/trocr-prescription")
+FAST_CPU_MODEL_NAME = "shubham879/trocr-prescription"
 IMAGE_SIZE = (384, 384)
 MAX_TARGET_LENGTH = 64
 BEAM_SIZE = 4

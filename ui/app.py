@@ -188,6 +188,12 @@ if app_mode == "Prescription Scanner":
             if output.needs_manual_review:
                 st.warning("⚠️ **Human-in-the-Loop Review Recommended:** Certain low-confidence handwriting or ambiguous drug names require pharmacist confirmation.")
 
+            # Clinical Findings Ribbon
+            if hasattr(output, "clinical_notes") and output.clinical_notes:
+                st.markdown("### 🩺 Clinical Findings & Patient Observations")
+                for note in output.clinical_notes:
+                    st.info(f"📌 {note}")
+
             # Structured Prescription Table
             st.markdown("### 📋 Digital Prescription Output")
 
