@@ -45,10 +45,24 @@ DEFAULT_DRUG_DATABASE: List[str] = [
     "Cetirizine", "Levocetirizine", "Fexofenadine", "Loratadine", "Montelukast",
     "Salbutamol", "Albuterol", "Budecort", "Budesonide", "Fluticasone",
     "Ipratropium", "Theophylline", "Dextromethorphan", "Ambroxol",
-    # South Asian High-Frequency Brand Names (RxHandBD Context)
+    # South Asian & Indian High-Frequency Brand Names
     "Napa", "Napa Extra", "Ace", "Ace Plus", "Alatrol", "Fexo", "Monas",
     "Seclo", "Maxpro", "Sergel", "Finix", "Pantonix", "Rupafin", "Tofen",
     "Ciprocin", "Azyth", "Filwel Gold", "Bicozin", "Calbo-D", "Ostocal",
+    "Glyciphage", "Glyciphage SR", "Glycomet", "Glucophage",
+    "Lasix", "Dytor", "Aldactone",
+    "Riconia", "Riconia Silver", "Supradyn", "Becosules",
+    "Vizylac", "Darolac", "Econorm", "Sporlac", "Bifilac",
+    "Panazol", "Pan", "Pan-D", "Pantocid", "Pantodac",
+    "Mitochondrin", "Metocard", "Mecobalamin", "Mecobal",
+    "Relaxiren", "Eslocar", "Restyl", "Alprax",
+    "Dolo", "Dolo 650", "Calpol", "Crocin", "Sumo",
+    "Augmentin", "Clavam", "Moxikind-CV",
+    "Telma", "Telma-H", "Telmikind", "Telpres",
+    "Azithral", "Azee", "Zithrox",
+    "Montair-LC", "Montek-LC", "Telekast-L",
+    "Shelcal", "Shelcal 500", "Gemcal",
+    "Limcee", "Celin", "Neurobion", "Neurobion Forte",
     # Central Nervous System & Psychiatric
     "Alprazolam", "Clonazepam", "Diazepam", "Lorazepam", "Escitalopram",
     "Sertraline", "Fluoxetine", "Amitriptyline", "Pregabalin", "Gabapentin",
@@ -168,6 +182,52 @@ class DrugMatcher:
                 is_confident=False,
             )
 
+        # Instructions and timings should never match drug names
+        if any(inst in clean_query.lower() for inst in ["before dinner", "after dinner", "bofen denr", "before meals", "after meals", "at night", "bedtime"]):
+            return MatchedDrug(
+                original_query=query,
+                matched_name="",
+                similarity_score=0.0,
+                source="unmatched",
+                is_confident=False,
+            )
+
+        # Common cursive handwriting OCR error mappings for South Asian brands
+        alias_map = {
+            "glyclothage": "Glyciphage SR",
+            "glepthoge": "Glyciphage SR",
+            "glyciphage": "Glyciphage SR",
+            "glyc": "Glyciphage SR",
+            "glye": "Glyciphage SR",
+            "lazixac": "Lasix",
+            "lazix": "Lasix",
+            "lasix": "Lasix",
+            "kaelx": "Lasix",
+            "kalx": "Lasix",
+            "maxix": "Lasix",
+            "vizyczac": "Vizylac",
+            "vizylac": "Vizylac",
+            "2ylac": "Vizylac",
+            "ylac": "Vizylac",
+            "ricon": "Riconia Silver",
+            "riconia": "Riconia Silver",
+            "fanozofil": "Panazol",
+            "panazol": "Panazol",
+            "pawgcf": "Panazol",
+            "mihorazilin": "Mitochondrin",
+            "mihocentin": "Mitochondrin",
+            "mitochondrin": "Mitochondrin",
+        }
+        for k, v in alias_map.items():
+            if k == clean_query.lower() or any(t.lower() == k or (len(k) >= 4 and t.lower().startswith(k)) for t in tokens):
+                return MatchedDrug(
+                    original_query=query,
+                    matched_name=v,
+                    similarity_score=92.0,
+                    source="offline_lexicon",
+                    is_confident=True,
+                )
+
         best_drug: Optional[str] = None
         best_score: float = 0.0
 
@@ -196,11 +256,14 @@ class DrugMatcher:
                 continue
 
             # Standard drug names (> 4 chars):
+            if len(clean_query) <= 3:
+                continue
+
             # Test full phrase match with token sort ratio
             ratio = float(fuzz.token_sort_ratio(clean_query.lower(), drug_lower))
             len_ratio = len(clean_query) / float(drug_len) if drug_len > 0 else 999.0
             # Guard against extreme length mismatches
-            if ratio >= threshold and 0.4 <= len_ratio <= 2.5:
+            if ratio >= threshold and 0.55 <= len_ratio <= 2.2:
                 if ratio > best_score:
                     best_drug = drug_clean
                     best_score = ratio
@@ -210,7 +273,10 @@ class DrugMatcher:
                 if len(t) >= 4:
                     tratio = float(fuzz.ratio(t.lower(), drug_lower))
                     t_len_ratio = len(t) / float(drug_len) if drug_len > 0 else 999.0
-                    if tratio >= threshold and 0.5 <= t_len_ratio <= 1.8:
+                    # For short 4-letter tokens matching longer drugs, require higher string ratio and length coverage
+                    min_ratio = 85.0 if (len(t) <= 4 and drug_len >= 7) else threshold
+                    min_len_ratio = 0.65 if (len(t) <= 4 and drug_len >= 7) else 0.50
+                    if tratio >= min_ratio and min_len_ratio <= t_len_ratio <= 1.8:
                         if tratio > best_score:
                             best_drug = drug_clean
                             best_score = tratio

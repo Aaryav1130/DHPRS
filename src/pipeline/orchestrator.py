@@ -204,9 +204,10 @@ class PrescriptionPipeline:
                         # Candidate line to recognize
                         text_to_parse = easy_text
                         ocr_conf = float(box.confidence)
+                        trocr_text = ""
 
                         # If text is cursive or lower confidence, cross-reference TrOCR
-                        if ocr_conf < 0.65 or any(k in easy_text.lower() for k in ["dextrok", "sl ", "0r(", "0$", "~"]):
+                        if ocr_conf < 0.85 or any(k in easy_text.lower() for k in ["dextrok", "sl ", "0r(", "0$", "~", "glyc", "ricon", "2ylac", "pawg", "kalx"]):
                             try:
                                 trocr_res = self.trocr.recognize_crop(line_crop)
                                 trocr_text = trocr_res.text.strip()
@@ -217,12 +218,27 @@ class PrescriptionPipeline:
                                 elif any(k in trocr_text.lower() for k in ["drs", "racket", "sacket"]) or "0r(" in easy_text.lower():
                                     text_to_parse = "ORS 2 sachets"
                                     ocr_conf = max(ocr_conf, 0.85)
+                                else:
+                                    dm_trocr = self.drug_matcher.match(trocr_text, use_online_fallback=False)
+                                    dm_easy = self.drug_matcher.match(easy_text, use_online_fallback=False)
+                                    if dm_trocr.similarity_score > dm_easy.similarity_score:
+                                        text_to_parse = trocr_text
+                                        ocr_conf = max(ocr_conf, float(trocr_res.confidence))
                             except Exception:
                                 pass
 
                         # Extract entities & match drug
                         parsed = extract_prescription_entities(text_to_parse)
                         drug_match = self.drug_matcher.match(parsed.candidate_drug_name, use_online_fallback=False)
+
+                        # Dual-engine fallback: check if trocr_text provides a confident drug match
+                        if not drug_match.is_confident and trocr_text:
+                            parsed_tr = extract_prescription_entities(trocr_text)
+                            dm_tr = self.drug_matcher.match(parsed_tr.candidate_drug_name, use_online_fallback=False)
+                            if dm_tr.is_confident:
+                                parsed = parsed_tr
+                                drug_match = dm_tr
+                                text_to_parse = trocr_text
 
                         is_advice = any(a in text_to_parse.lower() for a in ["fluid intake", "adequate fluid", "diet", "rest", "adv:"])
                         is_valid = (

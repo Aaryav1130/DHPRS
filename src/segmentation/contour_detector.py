@@ -83,9 +83,10 @@ def sort_bounding_boxes(
     return sorted_boxes
 
 
-def group_words_into_lines(detections: list, y_threshold: int = 22) -> List[BoundingBox]:
+def group_words_into_lines(detections: list, y_threshold: int = 22, max_x_gap: int = 75) -> List[BoundingBox]:
     """
     Groups individual word detections (e.g. from CRAFT/EasyOCR) into complete horizontal text lines.
+    Preserves multi-column separation by respecting max_x_gap.
     """
     items = []
     for item in detections:
@@ -126,21 +127,38 @@ def group_words_into_lines(detections: list, y_threshold: int = 22) -> List[Boun
     merged_boxes: List[BoundingBox] = []
     for line in lines:
         line_sorted = sorted(line, key=lambda w: w['x1'])
-        min_x = min(w['x1'] for w in line_sorted)
-        min_y = min(w['y1'] for w in line_sorted)
-        max_x = max(w['x2'] for w in line_sorted)
-        max_y = max(w['y2'] for w in line_sorted)
-        avg_prob = float(np.mean([w['prob'] for w in line_sorted]))
-        combined_text = " ".join([w['text'] for w in line_sorted if w.get('text')]).strip()
-        merged_boxes.append(BoundingBox(
-            x=int(min_x),
-            y=int(min_y),
-            w=int(max(1, max_x - min_x)),
-            h=int(max(1, max_y - min_y)),
-            confidence=avg_prob,
-            label="text_line",
-            text=combined_text,
-        ))
+        # Cluster within the line by max_x_gap to preserve column layouts
+        clusters = []
+        cur_clust = []
+        for w in line_sorted:
+            if not cur_clust:
+                cur_clust.append(w)
+            else:
+                gap = w['x1'] - cur_clust[-1]['x2']
+                if gap <= max_x_gap:
+                    cur_clust.append(w)
+                else:
+                    clusters.append(cur_clust)
+                    cur_clust = [w]
+        if cur_clust:
+            clusters.append(cur_clust)
+
+        for cl in clusters:
+            min_x = min(w['x1'] for w in cl)
+            min_y = min(w['y1'] for w in cl)
+            max_x = max(w['x2'] for w in cl)
+            max_y = max(w['y2'] for w in cl)
+            avg_prob = float(np.mean([w['prob'] for w in cl]))
+            combined_text = " ".join([w['text'] for w in cl if w.get('text')]).strip()
+            merged_boxes.append(BoundingBox(
+                x=int(min_x),
+                y=int(min_y),
+                w=int(max(1, max_x - min_x)),
+                h=int(max(1, max_y - min_y)),
+                confidence=avg_prob,
+                label="text_line",
+                text=combined_text,
+            ))
     return sort_bounding_boxes(merged_boxes)
 
 

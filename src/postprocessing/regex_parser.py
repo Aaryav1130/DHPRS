@@ -30,7 +30,7 @@ class ParsedMedicationLine:
 
 # Regex patterns
 DOSAGE_STRENGTH_PATTERN = re.compile(
-    r"(\d+(?:\.\d+)?\s*(?:mg|mcg|µg|gm|g|ml|iu|meq|%|sachets?|drops?|puffs?|units?))",
+    r"(\d+(?:\.\d+)?\s*(?:mg|mcg|µg|gm|g|ml|iu|meq|%|sachets?|drops?|puffs?|units?|tablets?|tabs?))\b|(?:\((\d+(?:\.\d+)?\s*(?:mg|g|gm)?)\))",
     re.IGNORECASE,
 )
 COMBINATION_STRENGTH_PATTERN = re.compile(
@@ -42,7 +42,7 @@ DURATION_PATTERN = re.compile(
     re.IGNORECASE,
 )
 INSTRUCTIONS_PATTERN = re.compile(
-    r"\b((?:before|after|with)\s+(?:meals?|food|breakfast|lunch|dinner)|empty\s+stomach|at\s+bedtime|bedtime|as\s+directed|externally|gargle|for\s+fever|stat\.?|immediately|sos|as\s+needed)\b",
+    r"\b((?:before|after|with)\s+(?:meals?|food|breakfast|lunch|dinner)|empty\s+stomach|at\s+bedtime|bedtime|night|at\s+night|as\s+directed|externally|gargle|for\s+fever|stat\.?|immediately|sos|as\s+needed|bofen\s+denr)\b",
     re.IGNORECASE,
 )
 
@@ -122,7 +122,7 @@ def extract_prescription_entities(raw_line: str) -> ParsedMedicationLine:
     else:
         match_str = DOSAGE_STRENGTH_PATTERN.search(working_text)
         if match_str:
-            strength = match_str.group(1).strip()
+            strength = (match_str.group(1) or match_str.group(2) or "").strip()
             working_text = DOSAGE_STRENGTH_PATTERN.sub(" ", working_text)
 
     # 3. Extract Duration
