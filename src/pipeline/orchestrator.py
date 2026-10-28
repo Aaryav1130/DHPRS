@@ -228,6 +228,13 @@ class PrescriptionPipeline:
                                 pass
 
                         # Extract entities & match drug
+                        if is_document_metadata(text_to_parse):
+                            continue
+                        if is_clinical_finding(text_to_parse):
+                            if text_to_parse not in clinical_notes:
+                                clinical_notes.append(text_to_parse)
+                            continue
+
                         parsed = extract_prescription_entities(text_to_parse)
                         drug_match = self.drug_matcher.match(parsed.candidate_drug_name, use_online_fallback=False)
 
@@ -242,13 +249,13 @@ class PrescriptionPipeline:
 
                         is_advice = any(a in text_to_parse.lower() for a in ["fluid intake", "adequate fluid", "diet", "rest", "adv:"])
                         is_valid = (
-                            drug_match.is_confident
-                            or parsed.dosage_form is not None
-                            or parsed.dosage_strength is not None
+                            (drug_match.is_confident and bool(drug_match.matched_name))
+                            or (parsed.dosage_form is not None and len(parsed.candidate_drug_name) >= 3 and drug_match.similarity_score >= 60.0)
+                            or (parsed.dosage_strength is not None and len(parsed.candidate_drug_name) >= 3 and drug_match.similarity_score >= 60.0)
                             or is_advice
                         )
 
-                        if not is_valid:
+                        if not is_valid or not (drug_match.matched_name or is_advice):
                             continue
 
                         final_drug_name = drug_match.matched_name if drug_match.is_confident else parsed.candidate_drug_name

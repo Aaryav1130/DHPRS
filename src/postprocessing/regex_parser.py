@@ -30,7 +30,7 @@ class ParsedMedicationLine:
 
 # Regex patterns
 DOSAGE_STRENGTH_PATTERN = re.compile(
-    r"(\d+(?:\.\d+)?\s*(?:mg|mcg|µg|gm|g|ml|iu|meq|%|sachets?|drops?|puffs?|units?|tablets?|tabs?))\b|(?:\((\d+(?:\.\d+)?\s*(?:mg|g|gm)?)\))",
+    r"(\d+(?:\.\d+)?\s*(?:mg|mcg|µg|gm|g|ml|iu|meq|%|sachets?|drops?|puffs?|units?|tablets?|tabs?))|(?:\((\d+(?:\.\d+)?\s*(?:mg|g|gm)?)\))",
     re.IGNORECASE,
 )
 COMBINATION_STRENGTH_PATTERN = re.compile(
@@ -48,7 +48,7 @@ INSTRUCTIONS_PATTERN = re.compile(
 
 
 def is_clinical_finding(text: str) -> bool:
-    """Detects whether a line represents clinical symptoms, diagnosis, or vitals rather than medication."""
+    """Detects whether a line represents clinical symptoms, diagnosis, vitals, or doctor advice rather than medication."""
     t = text.lower().strip()
     # If the line contains an explicit dosage form or strength, it is a medication prescription
     if any(f in t for f in ["tab ", "tab.", "cap ", "cap.", "syp ", "syp.", "inj ", "inj."]):
@@ -59,18 +59,29 @@ def is_clinical_finding(text: str) -> bool:
         "c/o", "co ", "imp:", "impression:", "o/e", "on exam",
         "bp", "bp -", "pr -", "bpm", "pulse", "rbs", "spo2",
         "hypoglycemic", "giddiness", "restlessness", "hypertension",
-        "diabetes"
+        "diabetes", "dm", "htn", "schizophrenia", "paranoid", "spondylosis",
+        "cholesterol", "triglyceride", "fever", "cough", "cold", "pain",
+        "call me", "if any problem", "continue other", "sugar medicines", "bp medicines",
+        "review on", "follow up", "next visit", "months back", "expired"
     ]
     return any(k in t for k in clinical_keywords)
 
 
 def is_document_metadata(text: str) -> bool:
-    """Detects hospital letterheads, patient demographics, or signatures."""
+    """Detects hospital letterheads, doctor credentials, patient demographics, or signatures."""
     t = text.lower().strip()
     metadata_keywords = [
         "hospital", "clinic", "centre", "center", "university",
         "institute", "medical sciences", "dr.", "doctor", "mbbs", "md",
-        "patient", "uhid", "ip no", "signature", "date:"
+        "patient", "uhid", "ip no", "signature", "date:", "date",
+        "consultant", "psychiatrist", "neurologist", "cardiologist", "physician", "surgeon",
+        "pediatrician", "gynecologist", "dermatologist", "specialist",
+        "regd", "regd.", "regd no", "reg. no", "reg no", "council",
+        "telephone", "resi", "phone", "plot #", "plot no", "colony", "road",
+        "secunderabad", "hyderabad", "delhi", "mumbai", "bangalore", "chennai", "kolkata",
+        "emergency", "admit at", "admit", "counselled over", "counselled", "counseling",
+        "mr.", "mrs.", "miss", "master", "yrs", "years", "male", "female",
+        "psychiatry", "psychiatric", "sesych", "palel", "patel", "tirumalogiri", "trimulgherry", "ballygunge",
     ]
     return any(k in t for k in metadata_keywords)
 
@@ -82,6 +93,12 @@ def extract_prescription_entities(raw_line: str) -> ParsedMedicationLine:
     """
     cleaned = raw_line.strip()
     working_text = cleaned
+
+    # Strip leading list indices or bullet noise (e.g. 1., 2), ①, ②, (1), 0, TJ, etc.)
+    working_text = re.sub(r"^(?:[①-⑩]|\(?\d+\)?|[0-9][a-zA-Z]?|\b[A-Za-z]\b)\s*[:\.\-]?\s*", "", working_text)
+
+    # Separate dosage form prefix if OCR joined it directly to the drug name (e.g. 'Tabatiyan' -> 'Tab atiyan')
+    working_text = re.sub(r"^(tab|cap|syp|inj)([a-zA-Z]{3,})", r"\1 \2", working_text, flags=re.IGNORECASE)
 
     # Strip leading prescription symbols like Rx, R/
     working_text = re.sub(r"^(?:rx|r/|r\\)\s*[:\.\-]?\s*", "", working_text, flags=re.IGNORECASE)

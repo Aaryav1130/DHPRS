@@ -66,6 +66,9 @@ DEFAULT_DRUG_DATABASE: List[str] = [
     # Central Nervous System & Psychiatric
     "Alprazolam", "Clonazepam", "Diazepam", "Lorazepam", "Escitalopram",
     "Sertraline", "Fluoxetine", "Amitriptyline", "Pregabalin", "Gabapentin",
+    "Sizodon", "Sizodon Plus", "Risperidone", "Qutipin", "Qutipin SR", "Quetiapine",
+    "Ativan", "Rivotril", "Serta", "Sertima", "Pacitane", "Trihexyphenidyl",
+    "Nexito", "Nexito Plus", "Oleanz", "Clonafit", "Zapiz",
     # Vitamins, Minerals & Supplements
     "Calcium Carbonate", "Cholecalciferol", "Vitamin D3", "Vitamin C",
     "Vitamin B-Complex", "Zinc Sulfate", "Folic Acid", "Ferrous Sulfate",
@@ -171,7 +174,7 @@ class DrugMatcher:
             )
 
         # Strip residual dosage numbers and unit markers
-        clean_query = re.sub(r"\b\d+(?:\.\d+)?\s*(?:mg|ml|mcg|gm|g|%|sachets?|tabs?|caps?)\b", "", query, flags=re.IGNORECASE).strip()
+        clean_query = re.sub(r"\d+(?:\.\d+)?\s*(?:mg|ml|mcg|gm|g|%|sachets?|tabs?|caps?)", "", query, flags=re.IGNORECASE).strip()
         tokens = [t for t in re.findall(r"[A-Za-z]+", clean_query) if len(t) >= 2]
         if not tokens:
             return MatchedDrug(
@@ -182,8 +185,16 @@ class DrugMatcher:
                 is_confident=False,
             )
 
-        # Instructions and timings should never match drug names
-        if any(inst in clean_query.lower() for inst in ["before dinner", "after dinner", "bofen denr", "before meals", "after meals", "at night", "bedtime"]):
+        # Non-drug clinical advice, timings, and credentials should never match drug names
+        non_drug_keywords = [
+            "before dinner", "after dinner", "bofen denr", "before meals", "after meals",
+            "at night", "bedtime", "call me", "call", "inbetween", "if any problem",
+            "if problem", "consultant", "psychiatrist", "neurologist", "emergency",
+            "admit", "counselled", "phone", "telephone", "continue other", "medicines",
+            "sugar medicines", "bp medicines", "road", "colony", "resi", "regd",
+            "month", "months", "week", "weeks", "year", "years", "six"
+        ]
+        if any(inst in clean_query.lower() for inst in non_drug_keywords):
             return MatchedDrug(
                 original_query=query,
                 matched_name="",
@@ -217,6 +228,21 @@ class DrugMatcher:
             "mihorazilin": "Mitochondrin",
             "mihocentin": "Mitochondrin",
             "mitochondrin": "Mitochondrin",
+            "sizodon": "Sizodon Plus",
+            "zodon": "Sizodon Plus",
+            "qutipin": "Qutipin",
+            "quetiapine": "Qutipin",
+            "rutipin": "Qutipin",
+            "qub piro": "Qutipin",
+            "ativan": "Ativan",
+            "atiyan": "Ativan",
+            "lorazepam": "Ativan",
+            "rivotril": "Rivotril",
+            "rivobil": "Rivotril",
+            "clonazepam": "Rivotril",
+            "serta": "Serta",
+            "sertraline": "Serta",
+            "sert": "Serta",
         }
         for k, v in alias_map.items():
             if k == clean_query.lower() or any(t.lower() == k or (len(k) >= 4 and t.lower().startswith(k)) for t in tokens):
@@ -273,9 +299,9 @@ class DrugMatcher:
                 if len(t) >= 4:
                     tratio = float(fuzz.ratio(t.lower(), drug_lower))
                     t_len_ratio = len(t) / float(drug_len) if drug_len > 0 else 999.0
-                    # For short 4-letter tokens matching longer drugs, require higher string ratio and length coverage
-                    min_ratio = 85.0 if (len(t) <= 4 and drug_len >= 7) else threshold
-                    min_len_ratio = 0.65 if (len(t) <= 4 and drug_len >= 7) else 0.50
+                    # For short tokens matching longer drugs, require higher string ratio and length coverage
+                    min_ratio = 85.0 if (len(t) <= 5 and drug_len >= 6) else threshold
+                    min_len_ratio = 0.75 if (len(t) <= 5 and drug_len >= 6) else 0.60
                     if tratio >= min_ratio and min_len_ratio <= t_len_ratio <= 1.8:
                         if tratio > best_score:
                             best_drug = drug_clean
