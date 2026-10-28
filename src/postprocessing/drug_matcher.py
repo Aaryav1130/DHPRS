@@ -54,6 +54,9 @@ DEFAULT_DRUG_DATABASE: List[str] = [
     "Riconia", "Riconia Silver", "Supradyn", "Becosules",
     "Vizylac", "Darolac", "Econorm", "Sporlac", "Bifilac",
     "Panazol", "Pan", "Pan-D", "Pantocid", "Pantodac",
+    "Pan-DSR", "DSR", "Rabikind-DSR", "Razo-DSR",
+    "Ofloxacin", "Oflox", "Oflox-OZ", "Oflomac",
+    "Nervix-M", "Nervia-M", "Nervigard-M", "Zerodol-SP", "Aceclo-SP",
     "Mitochondrin", "Metocard", "Mecobalamin", "Mecobal",
     "Relaxiren", "Eslocar", "Restyl", "Alprax",
     "Dolo", "Dolo 650", "Calpol", "Crocin", "Sumo",
@@ -192,7 +195,8 @@ class DrugMatcher:
             "if problem", "consultant", "psychiatrist", "neurologist", "emergency",
             "admit", "counselled", "phone", "telephone", "continue other", "medicines",
             "sugar medicines", "bp medicines", "road", "colony", "resi", "regd",
-            "month", "months", "week", "weeks", "year", "years", "six"
+            "month", "months", "week", "weeks", "year", "years", "six",
+            "medical", "legal", "purpose", "valid", "renort", "report", "disclaimer"
         ]
         if any(inst in clean_query.lower() for inst in non_drug_keywords):
             return MatchedDrug(
@@ -243,9 +247,30 @@ class DrugMatcher:
             "serta": "Serta",
             "sertraline": "Serta",
             "sert": "Serta",
+            "dsr": "Pan-DSR (Pantoprazole + Domperidone)",
+            "d.s.r": "Pan-DSR (Pantoprazole + Domperidone)",
+            "dsin": "Pan-DSR (Pantoprazole + Domperidone)",
+            "nefess": "Nervix-M",
+            "nervis": "Nervix-M",
+            "nervia": "Nervix-M",
+            "nervix": "Nervix-M",
+            "opth": "Ofloxacin 200mg",
+            "obrtlv": "Ofloxacin 200mg",
+            "oflox": "Ofloxacin 200mg",
+            "bu-s": "Zerodol-SP",
+            "bu s": "Zerodol-SP",
+            "oruf": "Zerodol-SP",
+            "oxa-sp": "Zerodol-SP",
         }
         for k, v in alias_map.items():
-            if k == clean_query.lower() or any(t.lower() == k or (len(k) >= 4 and t.lower().startswith(k)) for t in tokens):
+            k_lower = k.lower()
+            cq_lower = clean_query.lower()
+            if (
+                k_lower == cq_lower
+                or cq_lower.startswith(k_lower)
+                or (len(k_lower) >= 3 and k_lower in cq_lower)
+                or any(t.lower() == k_lower or (len(k_lower) >= 4 and t.lower().startswith(k_lower)) for t in tokens)
+            ):
                 return MatchedDrug(
                     original_query=query,
                     matched_name=v,

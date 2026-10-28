@@ -62,7 +62,8 @@ def is_clinical_finding(text: str) -> bool:
         "diabetes", "dm", "htn", "schizophrenia", "paranoid", "spondylosis",
         "cholesterol", "triglyceride", "fever", "cough", "cold", "pain",
         "call me", "if any problem", "continue other", "sugar medicines", "bp medicines",
-        "review on", "follow up", "next visit", "months back", "expired"
+        "review on", "follow up", "next visit", "months back", "expired",
+        "crepe bandage", "bandage", "warm water", "arm pouch", "rest to", "injured", "check up", "checkup",
     ]
     return any(k in t for k in clinical_keywords)
 
@@ -82,6 +83,7 @@ def is_document_metadata(text: str) -> bool:
         "emergency", "admit at", "admit", "counselled over", "counselled", "counseling",
         "mr.", "mrs.", "miss", "master", "yrs", "years", "male", "female",
         "psychiatry", "psychiatric", "sesych", "palel", "patel", "tirumalogiri", "trimulgherry", "ballygunge",
+        "legal", "not valid", "valid for", "purpose", "medical legal", "renort", "report", "disclaimer",
     ]
     return any(k in t for k in metadata_keywords)
 
@@ -103,8 +105,13 @@ def extract_prescription_entities(raw_line: str) -> ParsedMedicationLine:
     # Strip leading prescription symbols like Rx, R/
     working_text = re.sub(r"^(?:rx|r/|r\\)\s*[:\.\-]?\s*", "", working_text, flags=re.IGNORECASE)
 
-    # 1. Extract Dosage Form (handle standard and OCR variations like TAP, TAH, SVP, etc.)
+    # 1. Extract Dosage Form (handle standard, OCR variations, and ditto marks //, 11, ")
     dosage_form = None
+    ditto_match = re.match(r"^(?://|11|\"|''|,,)\s*[:\.\-]?\s*", working_text)
+    if ditto_match:
+        dosage_form = "Tablet"
+        working_text = working_text[ditto_match.end():]
+
     form_prefix_match = re.match(
         r"^(tab|tap|tah|cap|caq|syp|syr|svp|inj|drop|oint|crm|gel)[\.\-_:\s]+",
         working_text,
